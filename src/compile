@@ -1,0 +1,3 @@
+#!/bin/bash
+
+icc -std=c++11 Source.cpp -o bayes && ./bayes ../data/input/lymph_train.arff ../data/input/lymph_test/.arff n
