@@ -205,7 +205,7 @@ NominalAttr::NominalAttr(NominalAttr const &example) :
 		_possibleValList[i] = example._possibleValList[i];
 }
 
-//====================Detructor===================
+//====================Destructor===================
 NumericalAttr::~NumericalAttr()
 {
 	delete[] _entryList;
@@ -226,9 +226,8 @@ DataSet::~DataSet()
 			delete (NominalAttr*)_attrList[i];
 		else
 			delete (NumericalAttr*)_attrList[i];
-		_attrList[i] = nullptr;
 	}
-	//delete[] _attrList;
+	delete[] _attrList;
 	_attrList = nullptr;
 }
 
@@ -316,7 +315,7 @@ int NominalAttr::getValLabel(string const &entry) const
 		if (isThat(entry, i))
 			return i;
 	}
-
+	cerr << entry << endl;
 	cerr << "Entry not in the possibleValList!!!\n";
 	throw(-1);
 }
@@ -407,9 +406,6 @@ double NumericalAttr::condEntropy(NominalAttr const &attr2)
 		entryClone[m] = _entryList[m];
 	}
 	qsort(entryClone, _entryCount, sizeof(double), compare);
-	/*for (int i = 0; i < _entryCount; i++)
-	cout << entryClone[i] << endl;
-	cout << endl << endl;*/
 
 	double bestCondEntropy, bestSplitPoint;
 	for (int n = 0; n < _entryCount - 1; n++)//number of possible splitpoints
@@ -450,7 +446,7 @@ double NumericalAttr::condEntropy(NominalAttr const &attr2)
 			}
 			result -= probAttr1*plgp;
 		}
-		//cout << splitPoint << ":  " << result << endl;
+
 		for (int x = 0; x < attr2._possibleValCount; x++)
 		{
 			delete[] occurence[x];
@@ -466,11 +462,11 @@ double NumericalAttr::condEntropy(NominalAttr const &attr2)
 			bestSplitPoint = splitPoint;
 		}
 	}
-	//cout << "Return: " << bestCondEntropy << endl << endl << endl;
+
 	delete[] entryClone;
 	entryClone = nullptr;
 	_splitPoint = bestSplitPoint;
-	//cout << "Return: " << bestCondEntropy << endl << "splitPoint: " << _splitPoint << endl << endl << endl;
+
 	return bestCondEntropy;
 }
 
@@ -508,7 +504,6 @@ void DataSet::split(DataSet *&children, AbsAttr *&splitAttr)
 			bestAttr = i;
 			bestInfoGain = infoGain;
 		}
-		//	cout << "BestInfoGain: " << bestInfoGain << endl;
 	}
 
 	if (!(*_attrList[bestAttr]).isNominal())
@@ -531,7 +526,7 @@ void DataSet::split(DataSet *&children, AbsAttr *&splitAttr)
 		AbsAttr ***newAttrList = new AbsAttr **[2];
 		newAttrList[0] = new AbsAttr *[_attrCount];
 		newAttrList[1] = new AbsAttr *[_attrCount];
-		//cout << getEntryCount() << "   " << counter[0] << "    " << counter[1] << endl;
+		
 		for (int j = 0; j < _attrCount; j++)
 		{
 			newAttrList[0][j] = (*_attrList[j]).isNominal() ?
@@ -661,6 +656,11 @@ string const &DataSet::getMajorityLabel() const
 //=================getEntryValLabel====================
 int NominalAttr::getEntryValLabel(int index) const
 {
+	if (index >= _entryCount)
+	{
+		cerr << "Index given is larger than the capacity of entryList!!!\n";
+		throw -1;
+	}
 	return getValLabel(_entryList[index]);
 }
 

@@ -3,6 +3,7 @@
 #include <sstream>
 #include <string>
 #include <cmath>
+#include <cfloat>
 #include <cstdlib>
 #include "DataSet.hpp"
 #include "DataPrep.hpp"
@@ -14,8 +15,7 @@ int main(int argc, char* argv[])
     string trainFile(argv[1]);
     string testFile(argv[2]);
     bool isTAN = argv[3][0] == 't' || argv[3][0] == 'T';
-    
-
+	
 	dataPrep(trainFile, testFile);
 
 	ifstream fin1, fin2;
@@ -52,7 +52,7 @@ int main(int argc, char* argv[])
 	}
 	fin1.close();
     DataSet *dataSet = new DataSet(attrCount, initAttrList);
-	
+
 	AbsAttr **testAttrList = new AbsAttr*[attrCount];
 	int testEntryCount;
 	fin1.open("attr2.tmp", ios::in);
@@ -86,8 +86,11 @@ int main(int argc, char* argv[])
 	}
 	fin1.close();
     DataSet *testDataSet = new DataSet(attrCount, testAttrList);
-	
+	system("rm -rf temp.sh attr.tmp attr2.tmp data.tmp data2.tmp attrTest attrTrain");
+
 	ofstream fout;
+	fout.precision(8);
+
 	fout.open("result.dat", ios::out);
     if (isTAN)
     {
@@ -95,10 +98,17 @@ int main(int argc, char* argv[])
     }
     else 
     {
+		for (int i = 0; i < attrCount-1; i++)
+		{
+			fout << ((NominalAttr*)dataSet->_attrList[i])->_attrName << "  " 
+				<< ((NominalAttr*)dataSet->_attrList[attrCount-1])->_attrName << endl;
+		}
+		fout << endl;
+
 		// Use training data to calculate prior probabilities and likelihood
 		int featureCount = attrCount-1;
 		NominalAttr &targetAttr = (*(NominalAttr*)dataSet->_attrList[featureCount]);
-        int targetClassCount = targetAttr.getEntryCount();
+        int targetClassCount = targetAttr.getPossibleValCount();
 
         double ***likelihood = new double **[targetClassCount];
 		for (int i = 0 ;  i < targetClassCount; i++)
@@ -106,7 +116,7 @@ int main(int argc, char* argv[])
 			likelihood[i] = new double* [featureCount];
 			for (int j = 0; j < featureCount; j++)
 			{
-				int jClassCount = (*(NominalAttr*)dataSet->_attrList[featureCount]).getPossibleValCount();
+				int jClassCount = (*(NominalAttr*)dataSet->_attrList[j]).getPossibleValCount();
 				likelihood[i][j] = new double [jClassCount];
 				for (int k = 0; k < jClassCount; k++)
 					likelihood[i][j][k] = 0.;
@@ -120,31 +130,36 @@ int main(int argc, char* argv[])
 
 		for (int i = 0; i < trainEntryCount; i++)
 		{
-			int targetLabel = targetAttr.getValLabel(targetAttr._entryList[i]);
+			int targetLabel = targetAttr.getEntryValLabel(i);
 			for (int j = 0; j < featureCount; j++)
 			{
-				likelihood[targetLabel][j][((NominalAttr*)dataSet->_attrList[j])
-					->getValLabel(((NominalAttr*)dataSet->_attrList[j])->_entryList[i])] += 1.;
+				likelihood[targetLabel][j][((NominalAttr*)dataSet->_attrList[j])->getEntryValLabel(i)] += 1.;
+					// ->getValLabel(((NominalAttr*)dataSet->_attrList[j])->_entryList[i])] += 1.;
 			}
 			prior[targetLabel] += 1.;
 		}
+
 		for (int i = 0; i < targetClassCount; i++)
 		{
 			for (int j = 0; j < featureCount; j++)
 			{
 				for (int k = 0; k < ((NominalAttr*)dataSet->_attrList[j])->getPossibleValCount(); k++ )
 				{
-					likelihood[i][j][k] /= prior[i];
+					likelihood[i][j][k] = (likelihood[i][j][k] + 1) 
+						/ (prior[i] + ((NominalAttr*)dataSet->_attrList[j])->getPossibleValCount());
 				}
 			}
-			prior[i] /= trainEntryCount;
+			prior[i] = (prior[i] + 1) / (trainEntryCount + targetAttr.getPossibleValCount());
 		}
-
+		
 		// Use test set data to test the learned model
-		targetAttr = *(NominalAttr*)testDataSet->_attrList[featureCount];
+		NominalAttr &testTargetAttr = *(NominalAttr*)testDataSet->_attrList[featureCount];
+		targetClassCount = testTargetAttr.getPossibleValCount();
+		
+		int correctCount = 0;
 		for (int i = 0; i < testEntryCount; i++)
 		{
-			int bestGuess = 0;
+			int bestGuess;
 			double bestGuessProd;
 			double *currentProd = new double [targetClassCount];
 			double denominator = 0.;
@@ -160,7 +175,10 @@ int main(int argc, char* argv[])
 				denominator+= currentProd[j];
 
 				if (0 == j)
+				{
 					bestGuessProd = currentProd[j];
+					bestGuess = 0;
+				}
 				else
 				{
 					if (currentProd[j] > bestGuessProd)
@@ -169,14 +187,16 @@ int main(int argc, char* argv[])
 						bestGuessProd = currentProd[j];
 					}
 				}
-
 			}
-			fout << targetAttr._possibleValList[bestGuess] << "  " 
-				<< targetAttr._entryList[i] << bestGuessProd / denominator << endl;  
-
+			fout << std::fixed << testTargetAttr._possibleValList[bestGuess] << "  " 
+				<< testTargetAttr._entryList[i] << "  " << bestGuessProd / denominator << endl;  
+			if (testTargetAttr._possibleValList[bestGuess] == testTargetAttr._entryList[i])
+				correctCount++;
 			delete[] currentProd;
 			currentProd = nullptr;
 		}
+		fout << correctCount << endl;
+
 		// Garbage collection
 		delete[] prior; 
 		prior = nullptr;
@@ -192,15 +212,10 @@ int main(int argc, char* argv[])
 		likelihood = nullptr;
     }
 	fout.close();
-
+	
+	delete testDataSet;
 	delete dataSet;
-    delete testDataSet;
     
-
-
-
-    system("rm -rf temp.sh attr.tmp attr2.tmp data.tmp data2.tmp attrTest attrTrain");
-    
-    cin.get();
+    // cin.get();
     return 0;  
 }
