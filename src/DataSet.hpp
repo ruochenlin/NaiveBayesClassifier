@@ -98,6 +98,9 @@ public:
 	// check if entry matches the possibleValLabel-st in the possibleVals list
 	// pre: possibleValLabel must not be larger than possibleValCount
 	int getValLabel(string const &entry) const;
+
+	int getEntryValLabel(int index) const;
+	// Pre: index < _entryCount
 };
 
 
@@ -654,4 +657,11 @@ string const &DataSet::getMajorityLabel() const
 	counter = nullptr;
 	return targetAttr._possibleValList[majorLabelIndex];
 }
+
+//=================getEntryValLabel====================
+int NominalAttr::getEntryValLabel(int index) const
+{
+	return getValLabel(_entryList[index]);
+}
+
 #endif
