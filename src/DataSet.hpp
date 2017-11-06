@@ -50,7 +50,8 @@ class NumericalAttr : public AbsAttr
 	friend class DTree;
 	friend class Node;
 
-private:
+// private:
+public:
 	string _attrName;
 	int _entryCount;
 	double *_entryList;
@@ -74,7 +75,8 @@ class NominalAttr : public AbsAttr
 	friend class DataSet;
 	friend class DTree;
 	friend class Node;
-private:
+// 
+public:
 	string _attrName;
 	int _entryCount;
 	int _possibleValCount;
@@ -106,7 +108,8 @@ class DataSet
 	friend class NumericalAttr;
 	friend class DTree;
 	friend class Node;
-private:
+// private:
+public:
 	int _attrCount;
 	AbsAttr **_attrList;
 public:
