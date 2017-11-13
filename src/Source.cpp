@@ -4,11 +4,24 @@
 #include <string>
 #include <cmath>
 #include <cfloat>
+#include <vector>
 #include <cstdlib>
 #include "DataSet.hpp"
 #include "DataPrep.hpp"
 
 using namespace std;
+using std::vector;
+
+template<class T>
+bool inThere(const vector<T> &vec, T const &val)
+{
+	for (auto i : vec)
+	{
+		if (val == i)
+			return true;
+	}
+	return false;
+}
 
 int main(int argc, char* argv[])
 {
@@ -171,7 +184,15 @@ int main(int argc, char* argv[])
 				[targetAttr.getEntryValLabel(i)];
 		}
 
-		// Calculate conditional probability with Laplacian sum
+		double **condMutualInfo = new double *[featureCount - 1];
+		for (int i = 0; i < featureCount - 1; ++i)
+		{
+			condMutualInfo[i] = new double[featureCount - i - 1];
+			for (int j = 0; j < featureCount - i - 1; ++j)
+				condMutualInfo[i][j] = 0;
+		}
+
+		// Calculate conditional probabilities with Laplacian sum, and then calculate conditional mutual information
 		for (int i = 0; i < featureCount; ++i)
 		{
 			NominalAttr &feat1 = *(NominalAttr*) dataSet->_attrList[i];
@@ -195,13 +216,100 @@ int main(int argc, char* argv[])
 					}
 				}
 			}
-			
+		}
+		// calculate mutual conditional information
+		for (int i = 0; i < featureCount - 1; i++)
+		{
+			NominalAttr &feat1 = *(NominalAttr*)dataSet->_attrList[i];
+			int feat1ValCount = feat1.getPossibleValCount();
+			for (int j = 0; j < featureCount - i - 1; ++j)
+			{
+				int feat2Index = i + j + 1;
+				NominalAttr &feat2 = *(NominalAttr*) dataSet->_attrList[feat2Index];
+				int feat2ValCount = feat2.getPossibleValCount();
+				for (int k = 0; k < feat1ValCount; ++k)
+				{
+					for (int l = 0; l < feat2ValCount; ++l)
+					{
+						for (int m = 0; m < targetValCount; ++m)
+						{
+							condMutualInfo[i][j] += (counter[i][j][k][l][m] + 1)
+								/ (trainEntryCount + feat1ValCount * feat2ValCount * targetValCount)
+								* log2(jointProb[i][j][k][l][m] / condProb[i][k][m] / condProb[feat2Index][l][m]);
+						}
+					}
+				}
+			}
 		}
 		
+		for (int i = 0; i < featureCount-1; i++)
+		{
+			NominalAttr & feat1 = *((NominalAttr*)dataSet->_attrList[i]);
+			for (int j = 0; j < featureCount - i - 1; j++)
+			{
+				int feat2Index = i + j + 1;
+				NominalAttr &feat2 = *((NominalAttr*)dataSet->_attrList[feat2Index]);
+				int feat1ValCount = feat1.getPossibleValCount();
+				int feat2ValCount = feat2.getPossibleValCount();
+				for(int k = 0; k < feat1ValCount; k++)
+				{
+					for (int l = 0; l < feat2ValCount; l++)
+					{
+						delete[] jointProb[i][j][k][l];
+					}
+					delete[] jointProb[i][j][k];
+				}
+				delete[] jointProb[i][j];
+			}
+			delete[] jointProb[i];
+ 		}
+		delete[] jointProb;
+		jointProb = nullptr;
+
 		delete[] targetCounter;
 		targetCounter = nullptr;	
 
-		for (int i = 0; i < featureCount-1; i++)
+		int *findDad = new int[featureCount];
+		for (int i = 0; i < featureCount; i++)
+			findDad[i] = -1;
+		
+		vector<int> inTree = {0};
+		// Build Maximum Spanning Tree
+		while(inTree.size() < (decltype(inTree.size())) featureCount)
+		{
+			int bestDad, bestChild;
+			double bestWeight;
+			for (auto i : inTree)
+			{
+				bool weightInitialised = false;
+				for (int j = 0; j < featureCount; j++)
+				{
+					if (inThere(inTree, j))
+						continue;
+					if (!weightInitialised)
+					{
+						bestWeight = i < j ? condMutualInfo[i][j-i-1] : condMutualInfo[j][i-j-1];
+						bestChild = j;
+						bestDad = i;
+						weightInitialised = true;
+					}
+					else 
+					{
+						const double &currentWeight = i < j ? condMutualInfo[i][j-i-1] : condMutualInfo[j][i-j-1];
+						if (currentWeight > bestWeight)
+						{
+							bestDad = i;
+							bestChild = j;
+							bestWeight = currentWeight;
+						}
+					}
+				}
+			}
+			findDad[bestChild] = bestDad;
+			inTree.push_back(bestChild);
+		}
+		
+		for (int i = 0; i < featureCount - 1; i++)
 		{
 			NominalAttr & feat1 = *((NominalAttr*)dataSet->_attrList[i]);
 			for (int j = 0; j < featureCount - i - 1; j++)
@@ -221,43 +329,12 @@ int main(int argc, char* argv[])
 				delete[] counter[i][j];
 			}
 			delete[] counter[i];
-		 }
+ 		 }
 		 delete[] counter;
 		 counter = nullptr;
 
-
-		// double* condProb = new double [featureCount];
-		// double** mutualCondProb = new double *[featureCount-1];
-		// for (int i = 0; i < featureCount; i++)
-		// {
-		// 	if (i != featureCount-1)
-		// 	{
-		// 		mutualCondProb[i] = new double [featureCount-i];
-		// 		condProb[i] = 0;
-		// 		for (int j = 0; j < featureCount-i; j++)
-		// 		{
-		// 			int otherFeatIndex = i + j + 1;
-		// 			mutualCondProb[i][j] = 0;
-		// 		}
-		// 	}
-		// 	else
-		// 	{
-		// 		// TODO: deal with tail case: calculate condProb
-		// 	}
-		// }
-
-
-
-
-
-		for (int i = 0; i < attrCount; i++)
-		{
-			for(int j = 0; j < attrCount; j++)
-				delete[] mutualCondProb[i][j];
-			delete[] mutualCondProb[i];
-		}
-		delete[] mutualCondProb;
-		mutualCondProb = nullptr;
+		 delete[] findDad;
+		 findDad = nullptr;
     }
     else 
     {
