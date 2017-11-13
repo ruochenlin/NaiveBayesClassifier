@@ -94,7 +94,170 @@ int main(int argc, char* argv[])
 	fout.open("result.dat", ios::out);
     if (isTAN)
     {
-        // TODO: finish TAN NB Algo
+		// TODO: finish TAN NB Algo
+		NominalAttr &targetAttr = *((NominalAttr*)dataSet->_attrList[attrCount-1]);
+		int targetValCount = targetAttr.getPossibleValCount();
+		int featureCount = attrCount-1;
+
+		double *****counter = new double****[featureCount-1];
+		double *****jointProb = new double****[featureCount - 1];
+		
+		double ***condProb = new double **[featureCount];
+		for (int i = 0; i < featureCount; ++i)
+		{
+			int featValCount = ((NominalAttr*)dataSet->_attrList[i])->getPossibleValCount();
+			condProb[i] = new double* [featValCount];
+			for (int j = 0; j < featValCount; ++j)
+			{
+				condProb[i][j] = new double [targetValCount];
+				// Calculate conditional probabilities of features wrt target
+                for (int k = 0; k < targetValCount; ++k)
+                {
+					condProb[i][j][k] = 0.;
+				}
+			}
+		}
+
+		for (int i = 0; i < featureCount-1; i++)
+		{
+			NominalAttr & feat1 = *((NominalAttr*)dataSet->_attrList[i]);
+			counter[i] = new double***[featureCount - i - 1];
+			jointProb[i] = new double***[featureCount - i - 1];
+			for (int j = 0; j < featureCount - i - 1; j++)
+			{
+				int feat2Index = i + j + 1;
+				NominalAttr &feat2 = *((NominalAttr*)dataSet->_attrList[feat2Index]);
+				int feat1ValCount = feat1.getPossibleValCount();
+				int feat2ValCount = feat2.getPossibleValCount();
+				counter[i][j] = new double **[feat1ValCount];
+				jointProb[i][j] = new double **[feat1ValCount];
+				for(int k = 0; k < feat1ValCount; k++)
+				{
+					counter[i][j][k] = new double* [feat2ValCount];
+					jointProb[i][j][k] = new double* [feat2ValCount];
+					for (int l = 0; l < feat2ValCount; l++)
+					{
+						counter[i][j][k][l] = new double [targetValCount];
+						jointProb[i][j][k][l] = new double [targetValCount];
+						for (int m = 0; m < targetValCount; m++)
+						{
+							counter[i][j][k][l][m] = jointProb[i][j][k][l][m] = 0.;
+						}
+					}
+				}
+			}
+		}
+
+		int* targetCounter = new int[targetValCount];
+		for (int i = 0; i < targetValCount; ++i)
+			targetCounter[i] = 0;
+		
+		for (int i = 0; i < trainEntryCount; ++i)
+		{
+			++targetCounter[targetAttr.getEntryValLabel(i)];
+			for (int j = 0; j < featureCount - 1; ++j)
+			{
+				NominalAttr &feat1 = *((NominalAttr*)dataSet->_attrList[j]);
+				++condProb[j][feat1.getEntryValLabel(i)][targetAttr.getEntryValLabel(i)];
+				for (int k = 0; k < featureCount - j - 1; k++)
+				{
+					int feat2Index = j + k + 1;
+					NominalAttr &feat2 = *((NominalAttr*)dataSet->_attrList[feat2Index]);
+					counter[j][k][feat1.getEntryValLabel(i)][feat2.getEntryValLabel(i)]
+						[targetAttr.getEntryValLabel(i)] += 1.;
+				}
+			}
+			++condProb[featureCount-1][((NominalAttr*)dataSet->_attrList[featureCount-1])->getEntryValLabel(i)]\
+				[targetAttr.getEntryValLabel(i)];
+		}
+
+		// Calculate conditional probability with Laplacian sum
+		for (int i = 0; i < featureCount; ++i)
+		{
+			NominalAttr &feat1 = *(NominalAttr*) dataSet->_attrList[i];
+			int feat1ValCount = feat1.getPossibleValCount();
+			for (int j = 0; j < feat1ValCount; ++j)
+			{
+				for (int k = 0; k < targetValCount; ++k)
+				{
+					condProb[i][j][k] = (condProb[i][j][k] + 1.) / (targetCounter[k] + feat1ValCount);
+					if ( i != featureCount - 1)
+					{
+						for (int l = 0; l < featureCount - i - 1; ++l)
+						{
+							int feat2Index = i + l + 1;
+							NominalAttr &feat2 = *(NominalAttr*)dataSet->_attrList[feat2Index];
+							int feat2ValCount = feat2.getPossibleValCount();
+							for (int m = 0; m < feat2ValCount; ++m)
+								jointProb[i][l][j][m][k] = (counter[i][l][j][m][k] + 1) \
+									/ (targetCounter[k] + feat1ValCount * feat2ValCount);
+						}
+					}
+				}
+			}
+			
+		}
+		
+		delete[] targetCounter;
+		targetCounter = nullptr;	
+
+		for (int i = 0; i < featureCount-1; i++)
+		{
+			NominalAttr & feat1 = *((NominalAttr*)dataSet->_attrList[i]);
+			for (int j = 0; j < featureCount - i - 1; j++)
+			{
+				int feat2Index = i + j + 1;
+				NominalAttr &feat2 = *((NominalAttr*)dataSet->_attrList[feat2Index]);
+				int feat1ValCount = feat1.getPossibleValCount();
+				int feat2ValCount = feat2.getPossibleValCount();
+				for(int k = 0; k < feat1ValCount; k++)
+				{
+					for (int l = 0; l < feat2ValCount; l++)
+					{
+						delete[] counter[i][j][k][l];
+					}
+					delete[] counter[i][j][k];
+				}
+				delete[] counter[i][j];
+			}
+			delete[] counter[i];
+		 }
+		 delete[] counter;
+		 counter = nullptr;
+
+
+		// double* condProb = new double [featureCount];
+		// double** mutualCondProb = new double *[featureCount-1];
+		// for (int i = 0; i < featureCount; i++)
+		// {
+		// 	if (i != featureCount-1)
+		// 	{
+		// 		mutualCondProb[i] = new double [featureCount-i];
+		// 		condProb[i] = 0;
+		// 		for (int j = 0; j < featureCount-i; j++)
+		// 		{
+		// 			int otherFeatIndex = i + j + 1;
+		// 			mutualCondProb[i][j] = 0;
+		// 		}
+		// 	}
+		// 	else
+		// 	{
+		// 		// TODO: deal with tail case: calculate condProb
+		// 	}
+		// }
+
+
+
+
+
+		for (int i = 0; i < attrCount; i++)
+		{
+			for(int j = 0; j < attrCount; j++)
+				delete[] mutualCondProb[i][j];
+			delete[] mutualCondProb[i];
+		}
+		delete[] mutualCondProb;
+		mutualCondProb = nullptr;
     }
     else 
     {
