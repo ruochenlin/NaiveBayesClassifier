@@ -66,12 +66,6 @@ int main(int argc, char* argv[])
 	fin1.close();
     DataSet *dataSet = new DataSet(attrCount, initAttrList);
 
-	NominalAttr &target = *(NominalAttr*)dataSet->_attrList[attrCount-1];
-	for (int i = 0; i < target.getPossibleValCount(); ++i)
-	{
-		cout << target._possibleValList[i] << endl;
-	}
-
 	AbsAttr **testAttrList = new AbsAttr*[attrCount];
 	int testEntryCount;
 	fin1.open("attr2.tmp", ios::in);
@@ -105,15 +99,15 @@ int main(int argc, char* argv[])
 	}
 	fin1.close();
     DataSet *testDataSet = new DataSet(attrCount, testAttrList);
-//	system("rm -rf temp.sh attr.tmp attr2.tmp data.tmp data2.tmp attrTest attrTrain");
+    system("rm -rf temp.sh attr.tmp attr2.tmp data.tmp data2.tmp attrTest attrTrain");
 
 	ofstream fout;
-	fout.precision(8);
+	fout.precision(12);
 
 	fout.open("result.dat", ios::out);
     if (isTAN)
     {
-		// TODO: finish TAN NB Algo
+		// TAN NB Algo
 		NominalAttr &targetAttr = *((NominalAttr*)dataSet->_attrList[attrCount-1]);
 		int targetValCount = targetAttr.getPossibleValCount();
 		int featureCount = attrCount-1;
@@ -198,7 +192,7 @@ int main(int argc, char* argv[])
 				condMutualInfo[i][j] = 0;
 		}
 
-		// Calculate conditional probabilities with Laplacian sum, and then calculate conditional mutual information
+		// Calculate conditional probabilities with Laplace estimator, and then calculate conditional mutual information
 		for (int i = 0; i < featureCount; ++i)
 		{
 			NominalAttr &feat1 = *(NominalAttr*) dataSet->_attrList[i];
@@ -275,16 +269,16 @@ int main(int argc, char* argv[])
 		int *findDad = new int[featureCount];
 		for (int i = 0; i < featureCount; i++)
 			findDad[i] = -1;
-		
+
 		vector<int> inTree = {0};
 		// Build Maximum Spanning Tree
 		while(inTree.size() < (decltype(inTree.size())) featureCount)
 		{
 			int bestDad, bestChild;
 			double bestWeight;
+			bool weightInitialised = false;
 			for (auto i : inTree)
 			{
-				bool weightInitialised = false;
 				for (int j = 0; j < featureCount; j++)
 				{
 					if (inThere(inTree, j))
@@ -311,6 +305,7 @@ int main(int argc, char* argv[])
 			findDad[bestChild] = bestDad;
 			inTree.push_back(bestChild);
 		}
+
 
 		double ****likelihood = new double ***[featureCount];
 		// the first feature is the root of the max spanning tree, thus the iteration starts at 1
@@ -368,7 +363,28 @@ int main(int argc, char* argv[])
  		}
 		delete[] counter;
 		counter = nullptr;
-	
+		
+		for (int i = 0; i < featureCount - 1; ++i)
+		{
+			delete[] condMutualInfo[i];
+		}
+		delete[] condMutualInfo;
+		condMutualInfo = nullptr;
+
+		// Print the parenting relations
+		for (int i = 0; i < featureCount; i++)
+		{
+			NominalAttr &currentAttr = *(NominalAttr*)dataSet->_attrList[i];
+			if (0 == i)
+				fout << currentAttr._attrName << "  " << targetAttr._attrName << endl;
+			else
+			{
+				NominalAttr &parentAttr = *(NominalAttr*)dataSet->_attrList[findDad[i]];
+				fout << currentAttr._attrName << "  " << parentAttr._attrName << "  " << targetAttr._attrName << endl;
+			}
+		}
+		fout << endl;
+
 		// Test with the test set
 		int correctCount = 0;
 		NominalAttr &testTargetAttr = *(NominalAttr*)testDataSet->_attrList[attrCount - 1];
@@ -426,7 +442,7 @@ int main(int argc, char* argv[])
 			if  (testTargetAttr._possibleValList[bestGuess]  == testTargetAttr._entryList[i])
 				correctCount++;
 		}
-		fout << correctCount << " / " << testEntryCount << " = " << ((double)correctCount) / testEntryCount << endl;
+		fout << endl << correctCount << endl;
 		
 
 		delete[] prior;
@@ -444,6 +460,7 @@ int main(int argc, char* argv[])
 		targetCounter = nullptr;	
     }
     else 
+	// Naive Bayes
     {
 		for (int i = 0; i < attrCount-1; i++)
 		{
@@ -542,7 +559,7 @@ int main(int argc, char* argv[])
 			delete[] currentProd;
 			currentProd = nullptr;
 		}
-		fout << correctCount << endl;
+		fout << endl << correctCount << endl;
 
 		// Garbage collection
 		delete[] prior; 
