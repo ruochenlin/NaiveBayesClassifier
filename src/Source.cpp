@@ -66,6 +66,12 @@ int main(int argc, char* argv[])
 	fin1.close();
     DataSet *dataSet = new DataSet(attrCount, initAttrList);
 
+	NominalAttr &target = *(NominalAttr*)dataSet->_attrList[attrCount-1];
+	for (int i = 0; i < target.getPossibleValCount(); ++i)
+	{
+		cout << target._possibleValList[i] << endl;
+	}
+
 	AbsAttr **testAttrList = new AbsAttr*[attrCount];
 	int testEntryCount;
 	fin1.open("attr2.tmp", ios::in);
@@ -99,7 +105,7 @@ int main(int argc, char* argv[])
 	}
 	fin1.close();
     DataSet *testDataSet = new DataSet(attrCount, testAttrList);
-	system("rm -rf temp.sh attr.tmp attr2.tmp data.tmp data2.tmp attrTest attrTrain");
+//	system("rm -rf temp.sh attr.tmp attr2.tmp data.tmp data2.tmp attrTest attrTrain");
 
 	ofstream fout;
 	fout.precision(8);
