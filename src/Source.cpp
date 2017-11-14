@@ -266,9 +266,6 @@ int main(int argc, char* argv[])
 		delete[] jointProb;
 		jointProb = nullptr;
 
-		delete[] targetCounter;
-		targetCounter = nullptr;	
-
 		int *findDad = new int[featureCount];
 		for (int i = 0; i < featureCount; i++)
 			findDad[i] = -1;
@@ -308,6 +305,39 @@ int main(int argc, char* argv[])
 			findDad[bestChild] = bestDad;
 			inTree.push_back(bestChild);
 		}
+
+		double ****likelihood = new double ***[featureCount];
+		// the first feature is the root of the max spanning tree, thus the iteration starts at 1
+		for (int i = 1; i < featureCount; i++)
+		{
+			NominalAttr &currentFeat = *(NominalAttr*) dataSet->_attrList[i];
+			int currentValCount = currentFeat.getPossibleValCount();
+			likelihood[i] = new double **[currentValCount];
+			int dadIndex = findDad[i];
+			NominalAttr &dad = *(NominalAttr*)dataSet->_attrList[dadIndex];
+			int dadValCount = dad.getPossibleValCount();
+			for (int j = 0; j < currentValCount; j++)
+			{
+				likelihood[i][j] = new double *[dadValCount];
+				for (int k = 0; k < dadValCount; k++)
+				{
+					likelihood[i][j][k] = new double [targetValCount];
+					for (int l = 0; l < targetValCount; ++l)
+					{
+						double denominator = 0.;
+						for (int m = 0; m < currentValCount; ++m)
+						{
+							denominator += i < dadIndex ? 
+								counter[i][dadIndex - i - 1][m][k][l] :
+								counter[dadIndex][i - dadIndex - 1][k][m][l];
+						}
+						likelihood[i][j][k][l] = i < dadIndex ? 
+							(counter[i][dadIndex - i - 1][j][k][l] + 1) / (denominator + currentValCount) :
+							(counter[dadIndex][i - dadIndex - 1][k][j][l] + 1) / (denominator + currentValCount);
+					}
+				}
+			}
+		}
 		
 		for (int i = 0; i < featureCount - 1; i++)
 		{
@@ -329,12 +359,83 @@ int main(int argc, char* argv[])
 				delete[] counter[i][j];
 			}
 			delete[] counter[i];
- 		 }
-		 delete[] counter;
-		 counter = nullptr;
+ 		}
+		delete[] counter;
+		counter = nullptr;
+	
+		// Test with the test set
+		int correctCount = 0;
+		NominalAttr &testTargetAttr = *(NominalAttr*)testDataSet->_attrList[attrCount - 1];
+		double *prior = new double[targetValCount];
+		for (int i = 0; i < targetValCount; i++)
+		 	prior[i] = ((double) (targetCounter[i] + 1)) / (double)(trainEntryCount + targetValCount);
+		for (int i = 0; i < testEntryCount; i++)
+		{
+			double *numerator = new double[targetValCount];
+			for (int j = 0 ; j < targetValCount; j++)
+			{
+				numerator[j] = prior[j];
+			}
+			for (int j = 0; j < featureCount; j++)
+			{
+				NominalAttr &currentFeat = *(NominalAttr*)testDataSet->_attrList[j];
+				if ( j == 0 )
+				{
+					for (int k = 0; k < targetValCount; k++)
+					{
+						numerator[k] *= condProb[j][currentFeat.getEntryValLabel(i)][k];
+					}
+				}
+				else 
+				{
+					NominalAttr &parentFeat = *(NominalAttr*)testDataSet->_attrList[findDad[j]];
+					for (int  k = 0; k < targetValCount; k++)
+					{
+						numerator[k] *= likelihood[j][currentFeat.getEntryValLabel(i)]\
+							[parentFeat.getEntryValLabel(i)][k];
+					}
+				}
+			}
+			double normalization = 0;
+			int bestGuess = 0;
+			double bestProb;
+			for (int j = 0; j < targetValCount; ++j)
+			{
+				normalization += numerator[j];
+				if (j == 0)
+					bestProb = numerator[j];
+				else
+				{
+					if (numerator[j] > bestProb)
+					{
+						bestProb = numerator[j];
+						bestGuess = j;
+					}
+				}
+			}
+			delete[] numerator;
+			numerator = nullptr;
+			fout << testTargetAttr._possibleValList[bestGuess] << " " << testTargetAttr._entryList[i] 
+				<< " " << bestProb / normalization << endl;
+			if  (testTargetAttr._possibleValList[bestGuess]  == testTargetAttr._entryList[i])
+				correctCount++;
+		}
+		fout << correctCount << " / " << testEntryCount << " = " << ((double)correctCount) / testEntryCount << endl;
+		
 
-		 delete[] findDad;
-		 findDad = nullptr;
+		delete[] prior;
+		prior = nullptr;
+
+		for (int i = 0; i < featureCount; i++)
+		 	delete[] condProb[i];
+		delete[] condProb;
+		condProb = nullptr;
+
+		delete[] findDad;
+		findDad = nullptr;
+
+		delete[] targetCounter;
+		targetCounter = nullptr;	
     }
     else 
     {
