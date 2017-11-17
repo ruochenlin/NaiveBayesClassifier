@@ -99,7 +99,9 @@ int main(int argc, char* argv[])
 	}
 	fin1.close();
     DataSet *testDataSet = new DataSet(attrCount, testAttrList);
-    system("rm -rf temp.sh attr.tmp attr2.tmp data.tmp data2.tmp attrTest attrTrain");
+   
+    if (!argv[4])
+        system("rm -rf temp.sh attr.tmp attr2.tmp data.tmp data2.tmp attrTest attrTrain");
 
 	ofstream fout;
 	fout.precision(12);

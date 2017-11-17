@@ -1,0 +1,5 @@
+ 1. This Bayesian classifier program is written by Ruochen Lin for CS760 at UW-Madison in Fall '17.
+ 2. To compile, please use g++ or clang++ and add option -std=c++11.
+ 
+ Ruochen Lin
+ 15/11/17 

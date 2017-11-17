@@ -19,7 +19,7 @@ void dataPrep(string const &trainFile, string const &testFile)
 		"attrCount=`grep -c attribute " << newTrainFile << " `" << endl <<
 		"entryCount=$(($((lineCount)) - 2 - $((attrCount)))) " << endl <<
 		"echo \"$attrCount $entryCount\"> attr.tmp " << endl <<
-		"grep attribute " << newTrainFile << "  | sed -e 's/{/ nominal /g' | sed -e 's/numeric/real/g' | sed -e 's/}//g' | sed -e \"s/' / /g\" | awk -F \"'\" '{$1=\"\"; print $0}' | sed -e 's/,/ /g' | sed -e 's/  */ /g' | sed -e 's/\r//g' | awk '{$1=$1; print}'>> attr.tmp " << endl <<
+		"grep attribute " << newTrainFile << " | sed -e \"s/@attribute [^\']/@attribute \'/g\"  | sed -e 's/{/ nominal /g' | sed -e 's/numeric/real/g' | sed -e 's/}//g' | sed -e \"s/' / /g\" | awk -F \"'\" '{$1=\"\"; print $0}' | sed -e 's/,/ /g' | sed -e 's/  */ /g' | sed -e 's/\r//g' | awk '{$1=$1; print}'>> attr.tmp " << endl <<
 		"tail -$((entryCount)) " << newTrainFile << "  | sed -e 's/,/ /g' | sed -e \"s/'//g\" > data.tmp " << endl <<
 		"mkdir attrTrain " << endl <<
 		"for ((i=1; i <= $attrCount; i++)) " << endl <<
@@ -30,7 +30,7 @@ void dataPrep(string const &trainFile, string const &testFile)
 		"lineCount2=`wc -l " << newTestFile << " | awk '{print $1 }'` " << endl <<
 		"entryCount2=$(($((lineCount2)) - 2 - $((attrCount)))) " << endl <<
 		"echo \"$attrCount $entryCount2\" > attr2.tmp " << endl <<
-		"grep attribute " << newTestFile << " | sed -e 's/{/ nominal /g' | sed -e 's/numeric/real/g' | sed -e 's/}//g' | sed -e \"s/' / /g\" | awk -F \"'\" '{$1=\"\"; print $0}' | sed -e 's/,/ /g' | sed -e 's/  */ /g' | sed -e 's/\r//g' | awk '{$1=$1; print}' >> attr2.tmp " << endl <<
+		"grep attribute " << newTestFile << " | sed -e \"s/@attribute [^\']/@attribute \'/g\" | sed -e 's/{/ nominal /g' | sed -e 's/numeric/real/g' | sed -e 's/}//g' | sed -e \"s/' / /g\" | awk -F \"'\" '{$1=\"\"; print $0}' | sed -e 's/,/ /g' | sed -e 's/  */ /g' | sed -e 's/\r//g' | awk '{$1=$1; print}' >> attr2.tmp " << endl <<
 		"tail -$((entryCount2)) " << newTestFile << " | sed -e 's/,/ /g' | sed -e \"s/'//g\" > data2.tmp " << endl <<
 		"mkdir attrTest " << endl <<
 		"for ((j=1; j <= $attrCount; j++)) " << endl <<
